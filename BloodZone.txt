@@ -9,15 +9,20 @@ local mouse = player:GetMouse()
 -- Главная таблица UI для обхода лимита в 200 локальных переменных
 local UI = {}
 
+-- === АВТО-ОПРЕДЕЛЕНИЕ УСТРОЙСТВА ===
+local currentDevice = "PC"
+if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+    currentDevice = "Phone"
+end
+
 -- === STATE & LAYOUT VARS ===
 local themeColor = Color3.fromRGB(255, 255, 255) 
 local isRainbowTheme = false
 local themeObjects = {}
 local activeTabBtn = nil
-local currentDevice = "PC"
 
-local baseMenuWidth = 520
-local baseMenuHeight = 430
+local baseMenuWidth = currentDevice == "Phone" and 420 or 520
+local baseMenuHeight = currentDevice == "Phone" and 320 or 430
 local isSidebarExpanded = false
 
 local bindUIs = {}
@@ -48,6 +53,7 @@ local lang = {
     tabMain = "Основная",
     tabFriends = "Друзья",
     tabVisuals = "Визуалы",
+    tabFun = "Приколы",
     tabSettings = "Настройки",
     tabAbout = "О нас",
     aboutText = "<b><font color='#ff6464'>Создатель:</font></b>\n  dizrevc\n\n<b><font color='#64c8ff'>Скриптинг:</font></b>\n  dizrevc, Dimon08042\n\n<b><font color='#64ff64'>Помощники:</font></b>\n  Dead_slayerpro\n\n<b><font color='#ffc864'>Дизайн:</font></b>\n  bulochkassosiskoy96\n\n<b>Дата начала:</b> 21.08.2026\n\n<b>Наши соцсети:</b>\n  TG: @mansscripts\n  TT: @mansscripts_rbx\n  YT: @mansscripts_rbx\n\n<i>С любовью, Man's Scripts.</i>",
@@ -58,6 +64,10 @@ local lang = {
     removeFriend = "Удалить друга",
     rainbowBody = "Радужное тело",
     rainbowArms = "Радужные руки",
+    spin = "Спин (Крутилка)",
+    spinSettings = "Настройки Спина",
+    spinSpeed = "Скорость: ",
+    headless = "Без Головы",
     islandToggle = "Остров сверху",
     fovToggle = "Кастомный FOV",
     camFov = "FOV Камеры: ",
@@ -72,9 +82,11 @@ local lang = {
     save = "Сохранить",
     espSettings = "Настройки ESP",
     aimSettings = "Настройки Аимбота",
+    alwaysAimSettings = "Настройки Always Aim",
     editAim = "Переместить Aim (Тел)",
     resetAim = "Сбросить Aim (Тел)",
     islandSettings = "Настройки Острова",
+    islandNotifs = "Уведомления",
     fovSettings = "Настройки FOV",
     showFps = "Видеть FPS",
     showPing = "Видеть Пинг",
@@ -85,6 +97,8 @@ local lang = {
     arrowSize = "Размер стрелок: ",
     nick = "Ник",
     dist = "Дистанция",
+    espMaxDist = "Макс. Дистанция: ",
+    espTextSize = "Размер Текста: ",
     friendEsp = "ESP Друга",
     friendNick = "Ник Друга",
     espColorBtn = "Сменить цвет ESP",
@@ -96,6 +110,8 @@ local lang = {
     wallcheck = "Валлчек",
     targetEsp = "ESP Противника",
     radius = "Радиус (FOV): ",
+    constantTarget = "Постоянный таргет",
+    targetList = "Список таргетов",
     selectPlayer = "Выберите игрока",
     selectRemove = "Выберите друга для удаления",
     confirmTitle = "Подтверждение",
@@ -109,6 +125,17 @@ local lang = {
 
 local function tr(key)
     return lang[key] or key
+end
+
+-- === УВЕДОМЛЕНИЯ ОСТРОВА ===
+local islandNotificationsEnabled = true
+local notifText = ""
+local notifEndTime = 0
+
+local function showNotif(featName, state)
+    if not islandNotificationsEnabled then return end
+    notifText = "Функция " .. featName .. (state and ' <font color="#32C864">включена</font>' or ' <font color="#DC323C">выключена</font>')
+    notifEndTime = tick() + 5
 end
 
 -- === TWEEN HELPER ===
@@ -162,8 +189,8 @@ UI.gui.Enabled = true
 UI.gui.Parent = parentContainer
 
 UI.mainFrame = Instance.new("Frame")
-UI.mainFrame.Size = UDim2.new(0, 520, 0, 430)
-UI.mainFrame.Position = UDim2.new(0.5, -260, 0.5, -215)
+UI.mainFrame.Size = UDim2.new(0, baseMenuWidth, 0, baseMenuHeight)
+UI.mainFrame.Position = UDim2.new(0.5, -(baseMenuWidth/2), 0.5, -(baseMenuHeight/2))
 UI.mainFrame.Active = true
 UI.mainFrame.Draggable = true
 UI.mainFrame.ClipsDescendants = false
@@ -276,11 +303,13 @@ UI.title.TextXAlignment = Enum.TextXAlignment.Left
 UI.title.Parent = UI.mainFrame
 
 -- === ЛЕВАЯ ВЫДВИЖНАЯ ПАНЕЛЬ СО СТИКЕРАМИ ===
-UI.sidebar = Instance.new("Frame")
+UI.sidebar = Instance.new("ScrollingFrame")
 UI.sidebar.Size = UDim2.new(0, 40, 1, -50)
 UI.sidebar.Position = UDim2.new(0, 10, 0, 45) -- Слева
 UI.sidebar.BackgroundTransparency = 1
 UI.sidebar.ClipsDescendants = true
+UI.sidebar.ScrollBarThickness = 0
+UI.sidebar.CanvasSize = UDim2.new(0, 0, 0, 320)
 UI.sidebar.Parent = UI.mainFrame
 
 UI.expandBtn = Instance.new("TextButton")
@@ -344,8 +373,9 @@ end
 UI.tabMain = createSidebarTab("🏠", "tabMain", 42)
 UI.tabFriends = createSidebarTab("👥", "tabFriends", 84)
 UI.tabPlayer = createSidebarTab("👁️", "tabVisuals", 126)
-UI.tabSettings = createSidebarTab("⚙️", "tabSettings", 168)
-UI.tabAbout = createSidebarTab("ℹ️", "tabAbout", 210)
+UI.tabFun = createSidebarTab("🎭", "tabFun", 168)
+UI.tabSettings = createSidebarTab("⚙️", "tabSettings", 210)
+UI.tabAbout = createSidebarTab("ℹ️", "tabAbout", 252)
 activeTabBtn = UI.tabMain
 
 -- КОНТЕЙНЕР КОНТЕНТА
@@ -499,6 +529,7 @@ local keyBinds = {
     Menu = Enum.KeyCode.RightShift,
     ESP = nil,
     Aimbot = nil,
+    AlwaysAim = Enum.KeyCode.E,
     RainbowBody = nil,
     RainbowArms = nil,
     Island = nil,
@@ -580,6 +611,8 @@ Instance.new("UIPadding", UI.mainContent).PaddingTop = UDim.new(0, 15)
 
 UI.espToggle, UI.espSettingsBtn = createFeatureCard(UI.mainContent, tr("esp"), "👁️", true)
 UI.aimToggle, UI.aimSettingsBtn = createFeatureCard(UI.mainContent, tr("aimbot"), "🎯", true)
+UI.alwaysAimToggle, UI.alwaysAimSettingsBtn = createFeatureCard(UI.mainContent, "Always Aim", "🔫", true)
+UI.alwaysAimToggle.Parent.Visible = false
 
 -- FRIENDS TAB
 UI.friendsContent = Instance.new("Frame")
@@ -652,6 +685,25 @@ UI.rainbowBodyToggle, UI.rbSettingsBtn = createFeatureCard(UI.playerContent, tr(
 UI.rainbowArmsToggle, UI.raSettingsBtn = createFeatureCard(UI.playerContent, tr("rainbowArms"), "💪", true)
 UI.islandToggle, UI.islandSettingsBtn = createFeatureCard(UI.playerContent, tr("islandToggle"), "🏝️", true)
 UI.fovToggleBtn, UI.fovSettingsBtn = createFeatureCard(UI.playerContent, tr("fovToggle"), "🔍", true)
+
+-- FUN TAB
+UI.funContent = Instance.new("ScrollingFrame")
+UI.funContent.Size = UDim2.new(1, 0, 1, 0)
+UI.funContent.BackgroundTransparency = 1
+UI.funContent.Visible = false
+UI.funContent.ScrollBarThickness = 0
+UI.funContent.Parent = UI.contentContainer
+
+local funGrid = Instance.new("UIGridLayout")
+funGrid.CellSize = UDim2.new(0, 140, 0, 140)
+funGrid.CellPadding = UDim2.new(0, 15, 0, 15)
+funGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+funGrid.SortOrder = Enum.SortOrder.LayoutOrder
+funGrid.Parent = UI.funContent
+Instance.new("UIPadding", UI.funContent).PaddingTop = UDim.new(0, 15)
+
+UI.spinToggle, UI.spinSettingsBtn = createFeatureCard(UI.funContent, tr("spin"), "🌪️", true)
+UI.headlessToggle, _ = createFeatureCard(UI.funContent, tr("headless"), "👻", false)
 
 -- SETTINGS TAB
 UI.settingsContent = Instance.new("Frame")
@@ -939,6 +991,7 @@ end
 createBindRow(UI.bindsScroller, "Открытие меню", "Menu")
 createBindRow(UI.bindsScroller, tr("esp"), "ESP")
 createBindRow(UI.bindsScroller, tr("aimbot"), "Aimbot")
+createBindRow(UI.bindsScroller, "Always Aim", "AlwaysAim")
 createBindRow(UI.bindsScroller, tr("rainbowBody"), "RainbowBody")
 createBindRow(UI.bindsScroller, tr("rainbowArms"), "RainbowArms")
 createBindRow(UI.bindsScroller, tr("fovToggle"), "FOV")
@@ -948,28 +1001,13 @@ createBindRow(UI.bindsScroller, tr("islandToggle"), "Island")
 -- STATE VARIABLES
 local espEnabled = true
 local aimbotEnabled = true
-local aimRadius = 100
-local aimTarget = "HumanoidRootPart"
-local showName = true
-local showDist = true
-local rainbowBodyEnabled = false
-local rainbowArmsEnabled = false
-local islandEnabled = true
-local islandShowFps = true
-local islandShowPing = true
-local islandShowPlayers = false
-local islandShowEnemy = false
-local islandShowFriend = false
-local islandShowArrows = false
-local islandArrowSize = 24
-local customIslandPos = false
-local hasManuallyToggledIsland = false
-
-local aimFriendsEnabled = false
+local alwaysAimEnabled = false
 local wallcheckEnabled = true
 local targetEspEnabled = true
 local espFriendEnabled = true
 local friendNickEnabled = true
+local espMaxDist = 500
+local espTextSize = 14
 local customFovEnabled = false
 local currentCamFov = 70
 local friends = {}
@@ -982,6 +1020,42 @@ local isEspEnemyRainbow = false
 local espFriendColor = Color3.fromRGB(50, 255, 50)
 local isEspFriendRainbow = false
 local currentAimbotTarget = nil
+local currentAlwaysAimTarget = nil
+
+-- Aimbot Vars
+local aimRadius = 100
+local aimTarget = "HumanoidRootPart"
+local aimFriendsEnabled = false
+local aimConstantEnabled = false
+local aimConstantList = {}
+
+-- Always Aim Vars
+local alwaysAimRadius = 100
+local alwaysAimTarget = "HumanoidRootPart"
+local alwaysAimFriendsEnabled = false
+local alwaysAimConstantEnabled = false
+local alwaysAimConstantList = {}
+
+-- Visuals / Misc
+local showName = true
+local showDist = true
+local rainbowBodyEnabled = false
+local rbHighlightInstance = nil
+local rainbowArmsEnabled = false
+local spinEnabled = false
+local spinSpeed = 20
+local headlessEnabled = false
+local originalHeadTransparency = 0
+local islandEnabled = true
+local islandShowFps = true
+local islandShowPing = true
+local islandShowPlayers = false
+local islandShowEnemy = false
+local islandShowFriend = false
+local islandShowArrows = false
+local islandArrowSize = 24
+local customIslandPos = false
+local hasManuallyToggledIsland = false
 
 local updateFriendsList, initializeTexts
 
@@ -1012,6 +1086,8 @@ UI.islandStats.TextColor3 = Color3.fromRGB(200, 200, 200)
 UI.islandStats.Font = Enum.Font.GothamBold
 UI.islandStats.TextSize = 12
 UI.islandStats.TextXAlignment = Enum.TextXAlignment.Right
+UI.islandStats.RichText = true
+UI.islandStats.TextTruncate = Enum.TextTruncate.AtEnd
 UI.islandStats.Parent = UI.islandFrame
 
 -- MOBILE AIM BUTTON
@@ -1094,11 +1170,13 @@ local function updateDeviceLayout()
         isMobileAiming = false
         baseMenuWidth = 520
         baseMenuHeight = 430
+        if UI.alwaysAimToggle then UI.alwaysAimToggle.Parent.Visible = true end
     else
         UI.title.Text = "Man Script 📱"
         UI.mobileAimGui.Enabled = true
         baseMenuWidth = 420
         baseMenuHeight = 320
+        if UI.alwaysAimToggle then UI.alwaysAimToggle.Parent.Visible = false end
     end
 
     if UI.mainFrame.Visible then
@@ -1171,7 +1249,7 @@ UI.islandSettingsGui.Enabled = false
 UI.islandSettingsGui.ResetOnSpawn = false
 
 UI.islandSetFrame = Instance.new("Frame")
-UI.islandSetFrame.Size = UDim2.new(0, 300, 0, 480)
+UI.islandSetFrame.Size = UDim2.new(0, 300, 0, 500)
 UI.islandSetFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 UI.islandSetFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 UI.islandSetFrame.Parent = UI.islandSettingsGui
@@ -1195,7 +1273,7 @@ local function createIslandToggleBtn(textKey, y, defaultVal)
     lbl.Text = tr(textKey)
     lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
     lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 13
+    lbl.TextSize = 12
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = UI.islandSetFrame
 
@@ -1217,11 +1295,12 @@ UI.playersLbl, UI.playersToggleBtn = createIslandToggleBtn("showPlayers", 125, i
 UI.enemyLbl, UI.enemyToggleBtn = createIslandToggleBtn("showEnemy", 165, islandShowEnemy)
 UI.friendLbl, UI.friendToggleBtn = createIslandToggleBtn("showFriend", 205, islandShowFriend)
 UI.arrowsLbl, UI.arrowsToggleBtn = createIslandToggleBtn("showArrows", 245, islandShowArrows)
+UI.notifsLbl, UI.notifsToggleBtn = createIslandToggleBtn("islandNotifs", 285, islandNotificationsEnabled)
 
 -- ARROW SIZE SLIDER
 UI.arrSizeLabel = Instance.new("TextLabel")
 UI.arrSizeLabel.Size = UDim2.new(0, 250, 0, 25)
-UI.arrSizeLabel.Position = UDim2.new(0, 15, 0, 285)
+UI.arrSizeLabel.Position = UDim2.new(0, 15, 0, 325)
 UI.arrSizeLabel.BackgroundTransparency = 1
 UI.arrSizeLabel.Text = tr("arrowSize") .. tostring(islandArrowSize)
 UI.arrSizeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1232,7 +1311,7 @@ UI.arrSizeLabel.Parent = UI.islandSetFrame
 
 UI.arrSizeSliderBg = Instance.new("Frame")
 UI.arrSizeSliderBg.Size = UDim2.new(0, 260, 0, 10)
-UI.arrSizeSliderBg.Position = UDim2.new(0, 15, 0, 315)
+UI.arrSizeSliderBg.Position = UDim2.new(0, 15, 0, 355)
 UI.arrSizeSliderBg.Parent = UI.islandSetFrame
 applyGlassStyle(UI.arrSizeSliderBg, 5)
 
@@ -1281,12 +1360,13 @@ UI.playersToggleBtn.MouseButton1Click:Connect(function() islandShowPlayers = not
 UI.enemyToggleBtn.MouseButton1Click:Connect(function() islandShowEnemy = not islandShowEnemy; setToggleState(UI.enemyToggleBtn, islandShowEnemy) end)
 UI.friendToggleBtn.MouseButton1Click:Connect(function() islandShowFriend = not islandShowFriend; setToggleState(UI.friendToggleBtn, islandShowFriend) end)
 UI.arrowsToggleBtn.MouseButton1Click:Connect(function() islandShowArrows = not islandShowArrows; setToggleState(UI.arrowsToggleBtn, islandShowArrows) end)
+UI.notifsToggleBtn.MouseButton1Click:Connect(function() islandNotificationsEnabled = not islandNotificationsEnabled; setToggleState(UI.notifsToggleBtn, islandNotificationsEnabled) end)
 
-createFeatureBindUI(UI.islandSetFrame, "Island", 345)
+createFeatureBindUI(UI.islandSetFrame, "Island", 380)
 
 UI.editIslandBtn = Instance.new("TextButton")
 UI.editIslandBtn.Size = UDim2.new(0, 200, 0, 30)
-UI.editIslandBtn.Position = UDim2.new(0, 50, 0, 385)
+UI.editIslandBtn.Position = UDim2.new(0, 50, 0, 420)
 UI.editIslandBtn.Text = tr("editPos")
 UI.editIslandBtn.TextColor3 = Color3.fromRGB(255,255,255)
 UI.editIslandBtn.Font = Enum.Font.GothamBold
@@ -1296,7 +1376,7 @@ applyGlassStyle(UI.editIslandBtn, 8)
 
 UI.closeIslandBtn = Instance.new("TextButton")
 UI.closeIslandBtn.Size = UDim2.new(0, 100, 0, 30)
-UI.closeIslandBtn.Position = UDim2.new(0.5, -50, 0, 430)
+UI.closeIslandBtn.Position = UDim2.new(0.5, -50, 0, 460)
 UI.closeIslandBtn.Text = tr("close")
 UI.closeIslandBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 UI.closeIslandBtn.Font = Enum.Font.GothamBold
@@ -1582,6 +1662,82 @@ end)
 
 UI.confirmNoBtn.MouseButton1Click:Connect(function() closeModal() end)
 
+-- CONSTANT TARGET LIST MODAL
+UI.ctGui = Instance.new("ScreenGui", UI.gui)
+UI.ctGui.Enabled = false
+UI.ctFrame = Instance.new("Frame", UI.ctGui)
+UI.ctFrame.Size = UDim2.new(0, 320, 0, 380)
+UI.ctFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+UI.ctFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+table.insert(modalFrames, UI.ctFrame)
+applyGlassStyle(UI.ctFrame, 14)
+
+UI.ctTitle = Instance.new("TextLabel", UI.ctFrame)
+UI.ctTitle.Size = UDim2.new(1, 0, 0, 35)
+UI.ctTitle.BackgroundTransparency = 1
+UI.ctTitle.Text = tr("targetList")
+UI.ctTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.ctTitle.Font = Enum.Font.GothamBold
+UI.ctTitle.TextSize = 16
+
+UI.ctScroller = Instance.new("ScrollingFrame", UI.ctFrame)
+UI.ctScroller.Size = UDim2.new(0, 280, 0, 280)
+UI.ctScroller.Position = UDim2.new(0, 20, 0, 40)
+UI.ctScroller.BackgroundTransparency = 0.1
+UI.ctScroller.BorderSizePixel = 0
+UI.ctScroller.ScrollBarThickness = 4
+applyGlassStyle(UI.ctScroller, 8)
+local ctListLayout = Instance.new("UIListLayout", UI.ctScroller)
+ctListLayout.Padding = UDim.new(0, 4)
+
+UI.ctCloseBtn = Instance.new("TextButton", UI.ctFrame)
+UI.ctCloseBtn.Size = UDim2.new(0, 100, 0, 30)
+UI.ctCloseBtn.Position = UDim2.new(0.5, -50, 0, 335)
+UI.ctCloseBtn.Text = tr("close")
+UI.ctCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.ctCloseBtn.Font = Enum.Font.GothamBold
+UI.ctCloseBtn.TextSize = 13
+applyGlassStyle(UI.ctCloseBtn, 8)
+UI.ctCloseBtn.MouseButton1Click:Connect(function() closeModal() end)
+
+local activeCtDict = nil
+local function openCtList(dict)
+    activeCtDict = dict
+    for _, child in pairs(UI.ctScroller:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    local plrs = game.Players:GetPlayers()
+    table.sort(plrs, function(a, b) return a.Name:lower() < b.Name:lower() end)
+    
+    for _, plr in ipairs(plrs) do
+        if plr ~= player then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(0, 260, 0, 30)
+            btn.Text = plr.Name
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 13
+            btn.Parent = UI.ctScroller
+            
+            local isSelected = activeCtDict[plr.Name] == true
+            applyGlassStyle(btn, 6, isSelected and Color3.fromRGB(50, 200, 100) or themeColor)
+            
+            btn.MouseButton1Click:Connect(function()
+                if activeCtDict[plr.Name] then
+                    activeCtDict[plr.Name] = nil
+                    applyGlassStyle(btn, 6, themeColor)
+                else
+                    activeCtDict[plr.Name] = true
+                    applyGlassStyle(btn, 6, Color3.fromRGB(50, 200, 100))
+                end
+            end)
+        end
+    end
+    local count = #UI.ctScroller:GetChildren() - 1
+    UI.ctScroller.CanvasSize = UDim2.new(0, 0, 0, count * 35)
+    openModal(UI.ctGui, UI.ctFrame)
+end
+
 -- FRIEND LIST LOGIC
 updateFriendsList = function()
     for _, child in pairs(UI.friendsListScroller:GetChildren()) do
@@ -1820,7 +1976,7 @@ UI.espSettingsGui.Enabled = false
 UI.espSettingsGui.ResetOnSpawn = false
 
 UI.espSetFrame = Instance.new("Frame")
-UI.espSetFrame.Size = UDim2.new(0, 260, 0, 390)
+UI.espSetFrame.Size = UDim2.new(0, 260, 0, 480)
 UI.espSetFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 UI.espSetFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 UI.espSetFrame.Parent = UI.espSettingsGui
@@ -1904,11 +2060,103 @@ UI.friendColorBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
-createFeatureBindUI(UI.espSetFrame, "ESP", 285)
+-- Ползунок дистанции ESP
+UI.espDistLbl = Instance.new("TextLabel")
+UI.espDistLbl.Size = UDim2.new(0, 230, 0, 25)
+UI.espDistLbl.Position = UDim2.new(0, 15, 0, 280)
+UI.espDistLbl.BackgroundTransparency = 1
+UI.espDistLbl.Text = tr("espMaxDist") .. tostring(espMaxDist)
+UI.espDistLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.espDistLbl.Font = Enum.Font.GothamBold; UI.espDistLbl.TextSize = 13
+UI.espDistLbl.TextXAlignment = Enum.TextXAlignment.Left; UI.espDistLbl.Parent = UI.espSetFrame
+
+UI.espDistBg = Instance.new("Frame")
+UI.espDistBg.Size = UDim2.new(0, 230, 0, 10)
+UI.espDistBg.Position = UDim2.new(0, 15, 0, 305)
+UI.espDistBg.Parent = UI.espSetFrame
+applyGlassStyle(UI.espDistBg, 5)
+
+UI.espDistFill = Instance.new("Frame")
+UI.espDistFill.Size = UDim2.new((espMaxDist-50)/(10000-50), 0, 1, 0)
+UI.espDistFill.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+UI.espDistFill.BorderSizePixel = 0; UI.espDistFill.Parent = UI.espDistBg
+Instance.new("UICorner", UI.espDistFill).CornerRadius = UDim.new(0, 5)
+
+UI.espDistBtn = Instance.new("TextButton")
+UI.espDistBtn.Size = UDim2.new(1, 0, 1, 0)
+UI.espDistBtn.BackgroundTransparency = 1; UI.espDistBtn.Text = ""
+UI.espDistBtn.Parent = UI.espDistBg
+
+local draggingEspDist = false
+local function updateEspDist(input)
+    local pos = math.clamp((input.Position.X - UI.espDistBg.AbsolutePosition.X) / UI.espDistBg.AbsoluteSize.X, 0, 1)
+    espMaxDist = math.floor(50 + pos * (10000 - 50))
+    animate(UI.espDistFill, {Size = UDim2.new(pos, 0, 1, 0)}, 0.1)
+    UI.espDistLbl.Text = tr("espMaxDist") .. tostring(espMaxDist)
+end
+UI.espDistBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingEspDist = true; updateEspDist(input)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingEspDist = false end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if draggingEspDist and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateEspDist(input) end
+end)
+
+-- Ползунок размера текста ESP
+UI.espSizeLbl = Instance.new("TextLabel")
+UI.espSizeLbl.Size = UDim2.new(0, 230, 0, 25)
+UI.espSizeLbl.Position = UDim2.new(0, 15, 0, 320)
+UI.espSizeLbl.BackgroundTransparency = 1
+UI.espSizeLbl.Text = tr("espTextSize") .. tostring(espTextSize)
+UI.espSizeLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.espSizeLbl.Font = Enum.Font.GothamBold; UI.espSizeLbl.TextSize = 13
+UI.espSizeLbl.TextXAlignment = Enum.TextXAlignment.Left; UI.espSizeLbl.Parent = UI.espSetFrame
+
+UI.espSizeBg = Instance.new("Frame")
+UI.espSizeBg.Size = UDim2.new(0, 230, 0, 10)
+UI.espSizeBg.Position = UDim2.new(0, 15, 0, 345)
+UI.espSizeBg.Parent = UI.espSetFrame
+applyGlassStyle(UI.espSizeBg, 5)
+
+UI.espSizeFill = Instance.new("Frame")
+UI.espSizeFill.Size = UDim2.new((espTextSize-8)/(36-8), 0, 1, 0)
+UI.espSizeFill.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+UI.espSizeFill.BorderSizePixel = 0; UI.espSizeFill.Parent = UI.espSizeBg
+Instance.new("UICorner", UI.espSizeFill).CornerRadius = UDim.new(0, 5)
+
+UI.espSizeBtn = Instance.new("TextButton")
+UI.espSizeBtn.Size = UDim2.new(1, 0, 1, 0)
+UI.espSizeBtn.BackgroundTransparency = 1; UI.espSizeBtn.Text = ""
+UI.espSizeBtn.Parent = UI.espSizeBg
+
+local draggingEspSize = false
+local function updateEspSize(input)
+    local pos = math.clamp((input.Position.X - UI.espSizeBg.AbsolutePosition.X) / UI.espSizeBg.AbsoluteSize.X, 0, 1)
+    espTextSize = math.floor(8 + pos * (36 - 8))
+    animate(UI.espSizeFill, {Size = UDim2.new(pos, 0, 1, 0)}, 0.1)
+    UI.espSizeLbl.Text = tr("espTextSize") .. tostring(espTextSize)
+end
+UI.espSizeBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingEspSize = true; updateEspSize(input)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingEspSize = false end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if draggingEspSize and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateEspSize(input) end
+end)
+
+createFeatureBindUI(UI.espSetFrame, "ESP", 370)
 
 UI.espClose = Instance.new("TextButton")
 UI.espClose.Size = UDim2.new(0, 100, 0, 30)
-UI.espClose.Position = UDim2.new(0.5, -50, 0, 335)
+UI.espClose.Position = UDim2.new(0.5, -50, 0, 430)
 UI.espClose.Text = tr("close")
 UI.espClose.TextColor3 = Color3.fromRGB(255, 255, 255)
 UI.espClose.Font = Enum.Font.GothamBold
@@ -1921,7 +2169,9 @@ UI.espSettingsBtn.MouseButton1Click:Connect(function()
     openModal(UI.espSettingsGui, UI.espSetFrame)
 end)
 
--- AIMBOT SETTINGS WINDOW
+-- =========================================
+-- AIMBOT SETTINGS WINDOW (ОБЫЧНЫЙ АИМ)
+-- =========================================
 UI.aimSettingsGui = Instance.new("ScreenGui")
 UI.aimSettingsGui.Name = "AimSettings"
 UI.aimSettingsGui.Parent = UI.gui
@@ -1929,7 +2179,7 @@ UI.aimSettingsGui.Enabled = false
 UI.aimSettingsGui.ResetOnSpawn = false
 
 UI.aimSetFrame = Instance.new("Frame")
-UI.aimSetFrame.Size = UDim2.new(0, 270, 0, 480)
+UI.aimSetFrame.Size = UDim2.new(0, 270, 0, 560)
 UI.aimSetFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 UI.aimSetFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 UI.aimSetFrame.Parent = UI.aimSettingsGui
@@ -1983,8 +2233,8 @@ local function updateTargetButtons()
     animate(UI.bodyBtn, {BackgroundColor3 = (aimTarget == "HumanoidRootPart") and activeCol or inactiveCol, BackgroundTransparency = 0.1})
 end
 
-UI.headBtn.MouseButton1Click:Connect(function() aimTarget = "Head"; updateTargetButtons() end)
-UI.bodyBtn.MouseButton1Click:Connect(function() aimTarget = "HumanoidRootPart"; updateTargetButtons() end)
+UI.headBtn.MouseButton1Click:Connect(function() aimTarget = "Head"; updateTargetButtons(); showNotif("Цель Aimbot", "Head") end)
+UI.bodyBtn.MouseButton1Click:Connect(function() aimTarget = "HumanoidRootPart"; updateTargetButtons(); showNotif("Цель Aimbot", "Body") end)
 
 UI.aimFriendsBtn = Instance.new("TextButton")
 UI.aimFriendsBtn.Size = UDim2.new(0, 230, 0, 30)
@@ -2022,7 +2272,7 @@ UI.aimFovSliderBg.Parent = UI.aimSetFrame
 applyGlassStyle(UI.aimFovSliderBg, 5)
 
 UI.aimFovSliderFill = Instance.new("Frame")
-UI.aimFovSliderFill.Size = UDim2.new((aimRadius-30)/(240-30), 0, 1, 0)
+UI.aimFovSliderFill.Size = UDim2.new((aimRadius-30)/(400-30), 0, 1, 0)
 UI.aimFovSliderFill.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
 UI.aimFovSliderFill.BorderSizePixel = 0
 UI.aimFovSliderFill.Parent = UI.aimFovSliderBg
@@ -2036,11 +2286,49 @@ UI.aimFovBtn.BackgroundTransparency = 1
 UI.aimFovBtn.Text = ""
 UI.aimFovBtn.Parent = UI.aimFovSliderBg
 
+local draggingAimFov = false
+local function updateAimFov(input)
+    local pos = math.clamp((input.Position.X - UI.aimFovSliderBg.AbsolutePosition.X) / UI.aimFovSliderBg.AbsoluteSize.X, 0, 1)
+    aimRadius = math.floor(30 + pos * (400 - 30))
+    animate(UI.aimFovSliderFill, {Size = UDim2.new(pos, 0, 1, 0)}, 0.1)
+    UI.radiusLabel2.Text = tr("radius") .. tostring(aimRadius)
+end
+UI.aimFovBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingAimFov = true; updateAimFov(input)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingAimFov = false end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if draggingAimFov and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateAimFov(input) end
+end)
+
 createFeatureBindUI(UI.aimSetFrame, "Aimbot", 255)
+
+UI.aimConstantBtn = Instance.new("TextButton")
+UI.aimConstantBtn.Size = UDim2.new(0, 230, 0, 30)
+UI.aimConstantBtn.Position = UDim2.new(0, 20, 0, 295)
+UI.aimConstantBtn.Font = Enum.Font.GothamBold
+UI.aimConstantBtn.TextSize = 13
+UI.aimConstantBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.aimConstantBtn.Parent = UI.aimSetFrame
+applyGlassStyle(UI.aimConstantBtn, 8)
+
+UI.aimConstantListBtn = Instance.new("TextButton")
+UI.aimConstantListBtn.Size = UDim2.new(0, 230, 0, 30)
+UI.aimConstantListBtn.Position = UDim2.new(0, 20, 0, 335)
+UI.aimConstantListBtn.Text = tr("targetList")
+UI.aimConstantListBtn.Font = Enum.Font.GothamBold
+UI.aimConstantListBtn.TextSize = 13
+UI.aimConstantListBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.aimConstantListBtn.Parent = UI.aimSetFrame
+applyGlassStyle(UI.aimConstantListBtn, 8)
 
 UI.editAimBtn = Instance.new("TextButton")
 UI.editAimBtn.Size = UDim2.new(0, 230, 0, 30)
-UI.editAimBtn.Position = UDim2.new(0, 20, 0, 295)
+UI.editAimBtn.Position = UDim2.new(0, 20, 0, 375)
 UI.editAimBtn.Text = tr("editAim")
 UI.editAimBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 UI.editAimBtn.Font = Enum.Font.GothamBold
@@ -2050,7 +2338,7 @@ applyGlassStyle(UI.editAimBtn, 8)
 
 UI.resetAimBtn = Instance.new("TextButton")
 UI.resetAimBtn.Size = UDim2.new(0, 230, 0, 30)
-UI.resetAimBtn.Position = UDim2.new(0, 20, 0, 335)
+UI.resetAimBtn.Position = UDim2.new(0, 20, 0, 415)
 UI.resetAimBtn.Text = tr("resetAim")
 UI.resetAimBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 UI.resetAimBtn.Font = Enum.Font.GothamBold
@@ -2060,7 +2348,7 @@ applyGlassStyle(UI.resetAimBtn, 8)
 
 UI.aimSave = Instance.new("TextButton")
 UI.aimSave.Size = UDim2.new(0, 100, 0, 30)
-UI.aimSave.Position = UDim2.new(0.5, -50, 0, 425)
+UI.aimSave.Position = UDim2.new(0.5, -50, 0, 500)
 UI.aimSave.Text = tr("save")
 UI.aimSave.TextColor3 = Color3.fromRGB(255, 255, 255)
 UI.aimSave.Font = Enum.Font.GothamBold
@@ -2069,43 +2357,186 @@ UI.aimSave.Parent = UI.aimSetFrame
 applyGlassStyle(UI.aimSave, 8)
 
 UI.aimSave.MouseButton1Click:Connect(function() closeModal() end)
-UI.aimSettingsBtn.MouseButton1Click:Connect(function() 
-    openModal(UI.aimSettingsGui, UI.aimSetFrame)
-end)
-
+UI.aimSettingsBtn.MouseButton1Click:Connect(function() openModal(UI.aimSettingsGui, UI.aimSetFrame) end)
 UI.editAimBtn.MouseButton1Click:Connect(function()
     isEditingAimBtn = true
     openModal(UI.islandEditGui, UI.editControlsFrame)
 end)
-
 UI.resetAimBtn.MouseButton1Click:Connect(function()
     UI.mobileAimBtn.Position = UDim2.new(1, -90, 0.5, -30)
     originalAimPos = UI.mobileAimBtn.Position
 end)
 
-local function updateAimFov(input)
-    local pos = math.clamp((input.Position.X - UI.aimFovSliderBg.AbsolutePosition.X) / UI.aimFovSliderBg.AbsoluteSize.X, 0, 1)
-    aimRadius = math.floor(30 + pos * (240 - 30))
-    animate(UI.aimFovSliderFill, {Size = UDim2.new(pos, 0, 1, 0)}, 0.1)
-    UI.radiusLabel2.Text = tr("radius") .. tostring(aimRadius)
+UI.aimFriendsBtn.MouseButton1Click:Connect(function() aimFriendsEnabled = not aimFriendsEnabled; setToggleState(UI.aimFriendsBtn, aimFriendsEnabled, tr("aimFriends")); showNotif(tr("aimFriends"), aimFriendsEnabled) end)
+UI.targetEspBtn.MouseButton1Click:Connect(function() targetEspEnabled = not targetEspEnabled; setToggleState(UI.targetEspBtn, targetEspEnabled, tr("targetEsp")); showNotif(tr("targetEsp"), targetEspEnabled) end)
+UI.aimConstantBtn.MouseButton1Click:Connect(function() aimConstantEnabled = not aimConstantEnabled; setToggleState(UI.aimConstantBtn, aimConstantEnabled, tr("constantTarget")) end)
+UI.aimConstantListBtn.MouseButton1Click:Connect(function() openCtList(aimConstantList) end)
+
+
+-- =========================================
+-- ALWAYS AIM SETTINGS WINDOW (ОТДЕЛЬНО)
+-- =========================================
+UI.aaSettingsGui = Instance.new("ScreenGui")
+UI.aaSettingsGui.Name = "AlwaysAimSettings"
+UI.aaSettingsGui.Parent = UI.gui
+UI.aaSettingsGui.Enabled = false
+UI.aaSettingsGui.ResetOnSpawn = false
+
+UI.aaSetFrame = Instance.new("Frame")
+UI.aaSetFrame.Size = UDim2.new(0, 270, 0, 480)
+UI.aaSetFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+UI.aaSetFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+UI.aaSetFrame.Parent = UI.aaSettingsGui
+table.insert(modalFrames, UI.aaSetFrame)
+applyGlassStyle(UI.aaSetFrame, 12)
+
+UI.aaSetLabel = Instance.new("TextLabel")
+UI.aaSetLabel.Size = UDim2.new(1, 0, 0, 35)
+UI.aaSetLabel.BackgroundTransparency = 1
+UI.aaSetLabel.Text = tr("alwaysAimSettings")
+UI.aaSetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.aaSetLabel.Font = Enum.Font.GothamBold
+UI.aaSetLabel.TextSize = 16
+UI.aaSetLabel.Parent = UI.aaSetFrame
+
+UI.aaTargetLabel = Instance.new("TextLabel")
+UI.aaTargetLabel.Size = UDim2.new(0, 80, 0, 25)
+UI.aaTargetLabel.Position = UDim2.new(0, 20, 0, 40)
+UI.aaTargetLabel.BackgroundTransparency = 1
+UI.aaTargetLabel.Text = tr("target")
+UI.aaTargetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.aaTargetLabel.Font = Enum.Font.GothamBold
+UI.aaTargetLabel.TextSize = 14
+UI.aaTargetLabel.TextXAlignment = Enum.TextXAlignment.Left
+UI.aaTargetLabel.Parent = UI.aaSetFrame
+
+UI.aaHeadBtn = Instance.new("TextButton")
+UI.aaHeadBtn.Size = UDim2.new(0, 80, 0, 30)
+UI.aaHeadBtn.Position = UDim2.new(0, 20, 0, 70)
+UI.aaHeadBtn.Text = tr("head")
+UI.aaHeadBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.aaHeadBtn.Font = Enum.Font.GothamBold
+UI.aaHeadBtn.TextSize = 13
+UI.aaHeadBtn.Parent = UI.aaSetFrame
+applyGlassStyle(UI.aaHeadBtn, 8)
+
+UI.aaBodyBtn = Instance.new("TextButton")
+UI.aaBodyBtn.Size = UDim2.new(0, 80, 0, 30)
+UI.aaBodyBtn.Position = UDim2.new(0, 110, 0, 70)
+UI.aaBodyBtn.Text = tr("body")
+UI.aaBodyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.aaBodyBtn.Font = Enum.Font.GothamBold
+UI.aaBodyBtn.TextSize = 13
+UI.aaBodyBtn.Parent = UI.aaSetFrame
+applyGlassStyle(UI.aaBodyBtn, 8)
+
+local function updateAaTargetButtons()
+    local activeCol = Color3.fromRGB(50, 200, 100)
+    local inactiveCol = Color3.fromRGB(45, 45, 55)
+    animate(UI.aaHeadBtn, {BackgroundColor3 = (alwaysAimTarget == "Head") and activeCol or inactiveCol, BackgroundTransparency = 0.1})
+    animate(UI.aaBodyBtn, {BackgroundColor3 = (alwaysAimTarget == "HumanoidRootPart") and activeCol or inactiveCol, BackgroundTransparency = 0.1})
 end
 
-local draggingAimFov = false
-UI.aimFovBtn.InputBegan:Connect(function(input)
+UI.aaHeadBtn.MouseButton1Click:Connect(function() alwaysAimTarget = "Head"; updateAaTargetButtons(); showNotif("Цель Always Aim", "Head") end)
+UI.aaBodyBtn.MouseButton1Click:Connect(function() alwaysAimTarget = "HumanoidRootPart"; updateAaTargetButtons(); showNotif("Цель Always Aim", "Body") end)
+
+UI.aaAimFriendsBtn = Instance.new("TextButton")
+UI.aaAimFriendsBtn.Size = UDim2.new(0, 230, 0, 30)
+UI.aaAimFriendsBtn.Position = UDim2.new(0, 20, 0, 115)
+UI.aaAimFriendsBtn.Font = Enum.Font.GothamBold
+UI.aaAimFriendsBtn.TextSize = 13
+UI.aaAimFriendsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.aaAimFriendsBtn.Parent = UI.aaSetFrame
+applyGlassStyle(UI.aaAimFriendsBtn, 8)
+
+UI.aaRadiusLabel = Instance.new("TextLabel")
+UI.aaRadiusLabel.Size = UDim2.new(0, 230, 0, 25)
+UI.aaRadiusLabel.Position = UDim2.new(0, 20, 0, 155)
+UI.aaRadiusLabel.BackgroundTransparency = 1
+UI.aaRadiusLabel.Text = tr("radius") .. tostring(alwaysAimRadius)
+UI.aaRadiusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.aaRadiusLabel.Font = Enum.Font.GothamBold
+UI.aaRadiusLabel.TextSize = 14
+UI.aaRadiusLabel.TextXAlignment = Enum.TextXAlignment.Left
+UI.aaRadiusLabel.Parent = UI.aaSetFrame
+
+UI.aaFovSliderBg = Instance.new("Frame")
+UI.aaFovSliderBg.Size = UDim2.new(0, 230, 0, 10)
+UI.aaFovSliderBg.Position = UDim2.new(0, 20, 0, 185)
+UI.aaFovSliderBg.Parent = UI.aaSetFrame
+applyGlassStyle(UI.aaFovSliderBg, 5)
+
+UI.aaFovSliderFill = Instance.new("Frame")
+UI.aaFovSliderFill.Size = UDim2.new((alwaysAimRadius-30)/(400-30), 0, 1, 0)
+UI.aaFovSliderFill.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+UI.aaFovSliderFill.BorderSizePixel = 0
+UI.aaFovSliderFill.Parent = UI.aaFovSliderBg
+local aaFovFillCorner = Instance.new("UICorner")
+aaFovFillCorner.CornerRadius = UDim.new(0, 5)
+aaFovFillCorner.Parent = UI.aaFovSliderFill
+
+UI.aaFovBtn = Instance.new("TextButton")
+UI.aaFovBtn.Size = UDim2.new(1, 0, 1, 0)
+UI.aaFovBtn.BackgroundTransparency = 1
+UI.aaFovBtn.Text = ""
+UI.aaFovBtn.Parent = UI.aaFovSliderBg
+
+local draggingAaFov = false
+local function updateAaFov(input)
+    local pos = math.clamp((input.Position.X - UI.aaFovSliderBg.AbsolutePosition.X) / UI.aaFovSliderBg.AbsoluteSize.X, 0, 1)
+    alwaysAimRadius = math.floor(30 + pos * (400 - 30))
+    animate(UI.aaFovSliderFill, {Size = UDim2.new(pos, 0, 1, 0)}, 0.1)
+    UI.aaRadiusLabel.Text = tr("radius") .. tostring(alwaysAimRadius)
+end
+UI.aaFovBtn.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingAimFov = true; updateAimFov(input)
+        draggingAaFov = true; updateAaFov(input)
     end
 end)
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingAimFov = false
-    end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingAaFov = false end
 end)
 UserInputService.InputChanged:Connect(function(input)
-    if draggingAimFov and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        updateAimFov(input)
-    end
+    if draggingAaFov and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateAaFov(input) end
 end)
+
+createFeatureBindUI(UI.aaSetFrame, "AlwaysAim", 215)
+
+UI.aaConstantBtn = Instance.new("TextButton")
+UI.aaConstantBtn.Size = UDim2.new(0, 230, 0, 30)
+UI.aaConstantBtn.Position = UDim2.new(0, 20, 0, 255)
+UI.aaConstantBtn.Font = Enum.Font.GothamBold
+UI.aaConstantBtn.TextSize = 13
+UI.aaConstantBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.aaConstantBtn.Parent = UI.aaSetFrame
+applyGlassStyle(UI.aaConstantBtn, 8)
+
+UI.aaConstantListBtn = Instance.new("TextButton")
+UI.aaConstantListBtn.Size = UDim2.new(0, 230, 0, 30)
+UI.aaConstantListBtn.Position = UDim2.new(0, 20, 0, 295)
+UI.aaConstantListBtn.Text = tr("targetList")
+UI.aaConstantListBtn.Font = Enum.Font.GothamBold
+UI.aaConstantListBtn.TextSize = 13
+UI.aaConstantListBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.aaConstantListBtn.Parent = UI.aaSetFrame
+applyGlassStyle(UI.aaConstantListBtn, 8)
+
+UI.aaSave = Instance.new("TextButton")
+UI.aaSave.Size = UDim2.new(0, 100, 0, 30)
+UI.aaSave.Position = UDim2.new(0.5, -50, 0, 420)
+UI.aaSave.Text = tr("save")
+UI.aaSave.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.aaSave.Font = Enum.Font.GothamBold
+UI.aaSave.TextSize = 13
+UI.aaSave.Parent = UI.aaSetFrame
+applyGlassStyle(UI.aaSave, 8)
+
+UI.aaSave.MouseButton1Click:Connect(function() closeModal() end)
+UI.alwaysAimSettingsBtn.MouseButton1Click:Connect(function() openModal(UI.aaSettingsGui, UI.aaSetFrame) end)
+UI.aaAimFriendsBtn.MouseButton1Click:Connect(function() alwaysAimFriendsEnabled = not alwaysAimFriendsEnabled; setToggleState(UI.aaAimFriendsBtn, alwaysAimFriendsEnabled, tr("aimFriends")); showNotif("AlwaysAim Friends", alwaysAimFriendsEnabled) end)
+UI.aaConstantBtn.MouseButton1Click:Connect(function() alwaysAimConstantEnabled = not alwaysAimConstantEnabled; setToggleState(UI.aaConstantBtn, alwaysAimConstantEnabled, tr("constantTarget")) end)
+UI.aaConstantListBtn.MouseButton1Click:Connect(function() openCtList(alwaysAimConstantList) end)
+
 
 -- === FOV SETTINGS MODAL ===
 UI.fovSettingsGui = Instance.new("ScreenGui", UI.gui)
@@ -2200,6 +2631,7 @@ end)
 UI.fovToggleBtn.MouseButton1Click:Connect(function()
     customFovEnabled = not customFovEnabled
     setToggleState(UI.fovToggleBtn, customFovEnabled)
+    showNotif(tr("fovToggle"), customFovEnabled)
     if not customFovEnabled then
         workspace.CurrentCamera.FieldOfView = 70
     else
@@ -2222,7 +2654,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- === RAINBOW BODY & ARMS SETTINGS MODALS ===
+-- === RAINBOW BODY / ARMS & SPIN SETTINGS MODALS ===
 UI.rbGui = Instance.new("ScreenGui", UI.gui); UI.rbGui.Enabled = false
 UI.rbFrame = Instance.new("Frame", UI.rbGui)
 UI.rbFrame.Size = UDim2.new(0, 260, 0, 140)
@@ -2249,6 +2681,7 @@ UI.rbCloseBtn.Font = Enum.Font.GothamBold; UI.rbCloseBtn.TextSize = 13
 applyGlassStyle(UI.rbCloseBtn, 8)
 UI.rbCloseBtn.MouseButton1Click:Connect(function() closeModal() end)
 UI.rbSettingsBtn.MouseButton1Click:Connect(function() openModal(UI.rbGui, UI.rbFrame) end)
+
 
 UI.raGui = Instance.new("ScreenGui", UI.gui); UI.raGui.Enabled = false
 UI.raFrame = Instance.new("Frame", UI.raGui)
@@ -2277,33 +2710,183 @@ applyGlassStyle(UI.raCloseBtn, 8)
 UI.raCloseBtn.MouseButton1Click:Connect(function() closeModal() end)
 UI.raSettingsBtn.MouseButton1Click:Connect(function() openModal(UI.raGui, UI.raFrame) end)
 
+-- SPIN SETTINGS
+UI.spinGui = Instance.new("ScreenGui", UI.gui); UI.spinGui.Enabled = false
+UI.spinFrame = Instance.new("Frame", UI.spinGui)
+UI.spinFrame.Size = UDim2.new(0, 260, 0, 140)
+UI.spinFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+UI.spinFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+table.insert(modalFrames, UI.spinFrame)
+applyGlassStyle(UI.spinFrame, 12)
+
+UI.spinTitle = Instance.new("TextLabel", UI.spinFrame)
+UI.spinTitle.Size = UDim2.new(1, 0, 0, 35)
+UI.spinTitle.BackgroundTransparency = 1
+UI.spinTitle.Text = tr("spinSettings")
+UI.spinTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.spinTitle.Font = Enum.Font.GothamBold; UI.spinTitle.TextSize = 16
+
+UI.spinSpeedLbl = Instance.new("TextLabel", UI.spinFrame)
+UI.spinSpeedLbl.Size = UDim2.new(0, 230, 0, 25)
+UI.spinSpeedLbl.Position = UDim2.new(0, 15, 0, 40)
+UI.spinSpeedLbl.BackgroundTransparency = 1
+UI.spinSpeedLbl.Text = tr("spinSpeed") .. tostring(spinSpeed)
+UI.spinSpeedLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.spinSpeedLbl.Font = Enum.Font.GothamBold; UI.spinSpeedLbl.TextSize = 13
+UI.spinSpeedLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+UI.spinSpeedBg = Instance.new("Frame", UI.spinFrame)
+UI.spinSpeedBg.Size = UDim2.new(0, 230, 0, 10)
+UI.spinSpeedBg.Position = UDim2.new(0, 15, 0, 65)
+applyGlassStyle(UI.spinSpeedBg, 5)
+
+UI.spinSpeedFill = Instance.new("Frame", UI.spinSpeedBg)
+UI.spinSpeedFill.Size = UDim2.new((spinSpeed-1)/(100-1), 0, 1, 0)
+UI.spinSpeedFill.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+UI.spinSpeedFill.BorderSizePixel = 0
+Instance.new("UICorner", UI.spinSpeedFill).CornerRadius = UDim.new(0, 5)
+
+UI.spinSpeedBtn = Instance.new("TextButton", UI.spinSpeedBg)
+UI.spinSpeedBtn.Size = UDim2.new(1, 0, 1, 0)
+UI.spinSpeedBtn.BackgroundTransparency = 1; UI.spinSpeedBtn.Text = ""
+
+local draggingSpin = false
+local function updateSpinSpeed(input)
+    local pos = math.clamp((input.Position.X - UI.spinSpeedBg.AbsolutePosition.X) / UI.spinSpeedBg.AbsoluteSize.X, 0, 1)
+    spinSpeed = math.floor(1 + pos * (100 - 1))
+    animate(UI.spinSpeedFill, {Size = UDim2.new(pos, 0, 1, 0)}, 0.1)
+    UI.spinSpeedLbl.Text = tr("spinSpeed") .. tostring(spinSpeed)
+end
+UI.spinSpeedBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingSpin = true; updateSpinSpeed(input)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingSpin = false end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if draggingSpin and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateSpinSpeed(input) end
+end)
+
+UI.spinCloseBtn = Instance.new("TextButton", UI.spinFrame)
+UI.spinCloseBtn.Size = UDim2.new(0, 100, 0, 30)
+UI.spinCloseBtn.Position = UDim2.new(0.5, -50, 0, 95)
+UI.spinCloseBtn.Text = tr("close")
+UI.spinCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+UI.spinCloseBtn.Font = Enum.Font.GothamBold; UI.spinCloseBtn.TextSize = 13
+applyGlassStyle(UI.spinCloseBtn, 8)
+UI.spinCloseBtn.MouseButton1Click:Connect(function() closeModal() end)
+UI.spinSettingsBtn.MouseButton1Click:Connect(function() openModal(UI.spinGui, UI.spinFrame) end)
+
 -- APPLY MODAL SCALES
 for _, frame in ipairs(modalFrames) do
     Instance.new("UIScale", frame)
 end
 
--- TOGGLE ACTIONS
-UI.espToggle.MouseButton1Click:Connect(function() espEnabled = not espEnabled; setToggleState(UI.espToggle, espEnabled) end)
+-- === РАДУЖНОЕ ТЕЛО (ОТ ДРУГА) ===
+local function createOrUpdateHighlight()
+    if not player.Character then return end
+    if rbHighlightInstance then rbHighlightInstance:Destroy() end
+    local char = player.Character
+    local rootPart = char:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    rbHighlightInstance = Instance.new("Highlight")
+    rbHighlightInstance.Parent = rootPart
+    rbHighlightInstance.Adornee = char
+    rbHighlightInstance.OutlineTransparency = 1
+    rbHighlightInstance.FillTransparency = 0.4
+    rbHighlightInstance.OutlineColor = Color3.new(0,0,0)
+end
 
-UI.aimToggle.MouseButton1Click:Connect(function() 
-    aimbotEnabled = not aimbotEnabled; 
-    setToggleState(UI.aimToggle, aimbotEnabled) 
+local function stopRainbowEffect()
+    if rbHighlightInstance then 
+        rbHighlightInstance:Destroy() 
+        rbHighlightInstance = nil
+    end
+end
+
+-- === HEADLESS (ОТ ДРУГА) ===
+local function updateHeadless()
+    local char = player.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+    if headlessEnabled then
+        if head.Transparency ~= 1 then originalHeadTransparency = head.Transparency end
+        head.Transparency = 1
+        for _, v in pairs(head:GetDescendants()) do
+            if v:IsA("Decal") then
+                if v.Transparency ~= 1 and not v:GetAttribute("OrigTrans") then
+                    v:SetAttribute("OrigTrans", v.Transparency)
+                end
+                v.Transparency = 1
+            end
+        end
+    else
+        head.Transparency = originalHeadTransparency
+        for _, v in pairs(head:GetDescendants()) do
+            if v:IsA("Decal") then
+                local orig = v:GetAttribute("OrigTrans")
+                if orig then
+                    v.Transparency = orig
+                else
+                    v.Transparency = 0
+                end
+            end
+        end
+    end
+end
+
+player.CharacterAdded:Connect(function()
+    stopRainbowEffect()
+    task.wait(0.5)
+    if rainbowBodyEnabled then createOrUpdateHighlight() end
+    if headlessEnabled then updateHeadless() end
 end)
 
+
+-- TOGGLE ACTIONS
+UI.espToggle.MouseButton1Click:Connect(function() espEnabled = not espEnabled; setToggleState(UI.espToggle, espEnabled); showNotif(tr("esp"), espEnabled) end)
+UI.aimToggle.MouseButton1Click:Connect(function() 
+    aimbotEnabled = not aimbotEnabled
+    setToggleState(UI.aimToggle, aimbotEnabled)
+    showNotif(tr("aimbot"), aimbotEnabled) 
+    if aimbotEnabled and alwaysAimEnabled then
+        alwaysAimEnabled = false
+        setToggleState(UI.alwaysAimToggle, false)
+    end
+end)
+
+UI.alwaysAimToggle.MouseButton1Click:Connect(function() 
+    alwaysAimEnabled = not alwaysAimEnabled
+    setToggleState(UI.alwaysAimToggle, alwaysAimEnabled)
+    showNotif("Always Aim", alwaysAimEnabled) 
+    if alwaysAimEnabled and aimbotEnabled then
+        aimbotEnabled = false
+        setToggleState(UI.aimToggle, false)
+    end
+end)
+
+-- Убрано старое привязывание alwaysAim к настройкам обычного аимбота.
+-- Теперь у каждого свои настройки.
+
+
 UI.rainbowBodyToggle.MouseButton1Click:Connect(function() 
-    rainbowBodyEnabled = not rainbowBodyEnabled; 
+    rainbowBodyEnabled = not rainbowBodyEnabled 
     setToggleState(UI.rainbowBodyToggle, rainbowBodyEnabled) 
-    if not rainbowBodyEnabled and player.Character then
-        for _, name in ipairs({"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}) do
-            local p = player.Character:FindFirstChild(name)
-            if p and p:FindFirstChild("BodyHL") then p.BodyHL:Destroy() end
-        end
+    showNotif(tr("rainbowBody"), rainbowBodyEnabled)
+    if rainbowBodyEnabled then
+        createOrUpdateHighlight()
+    else
+        stopRainbowEffect()
     end
 end)
 
 UI.rainbowArmsToggle.MouseButton1Click:Connect(function() 
     rainbowArmsEnabled = not rainbowArmsEnabled; 
     setToggleState(UI.rainbowArmsToggle, rainbowArmsEnabled) 
+    showNotif(tr("rainbowArms"), rainbowArmsEnabled)
     if not rainbowArmsEnabled and player.Character then
         for _, name in ipairs({"Left Arm", "Right Arm", "LeftArm", "RightArm"}) do
             local p = player.Character:FindFirstChild(name)
@@ -2312,27 +2895,29 @@ UI.rainbowArmsToggle.MouseButton1Click:Connect(function()
     end
 end)
 
+UI.spinToggle.MouseButton1Click:Connect(function() spinEnabled = not spinEnabled; setToggleState(UI.spinToggle, spinEnabled); showNotif(tr("spin"), spinEnabled) end)
+UI.headlessToggle.MouseButton1Click:Connect(function() headlessEnabled = not headlessEnabled; setToggleState(UI.headlessToggle, headlessEnabled); showNotif(tr("headless"), headlessEnabled); updateHeadless() end)
+
 UI.islandToggle.MouseButton1Click:Connect(function() 
     hasManuallyToggledIsland = true
     islandEnabled = not islandEnabled
     setToggleState(UI.islandToggle, islandEnabled)
+    showNotif(tr("islandToggle"), islandEnabled)
     UI.islandFrame.Visible = islandEnabled
     if not islandEnabled then
         arrowFolder:ClearAllChildren()
     end
 end)
 
-UI.nameCheck.MouseButton1Click:Connect(function() showName = not showName; setToggleState(UI.nameCheck, showName, tr("nick")) end)
-UI.distCheck.MouseButton1Click:Connect(function() showDist = not showDist; setToggleState(UI.distCheck, showDist, tr("dist")) end)
-UI.espFriendCheck.MouseButton1Click:Connect(function() espFriendEnabled = not espFriendEnabled; setToggleState(UI.espFriendCheck, espFriendEnabled, tr("friendEsp")) end)
-UI.friendNickCheck.MouseButton1Click:Connect(function() friendNickEnabled = not friendNickEnabled; setToggleState(UI.friendNickCheck, friendNickEnabled, tr("friendNick")) end)
-UI.aimFriendsBtn.MouseButton1Click:Connect(function() aimFriendsEnabled = not aimFriendsEnabled; setToggleState(UI.aimFriendsBtn, aimFriendsEnabled, tr("aimFriends")) end)
-UI.targetEspBtn.MouseButton1Click:Connect(function() targetEspEnabled = not targetEspEnabled; setToggleState(UI.targetEspBtn, targetEspEnabled, tr("targetEsp")) end)
+UI.nameCheck.MouseButton1Click:Connect(function() showName = not showName; setToggleState(UI.nameCheck, showName, tr("nick")); showNotif(tr("nick"), showName) end)
+UI.distCheck.MouseButton1Click:Connect(function() showDist = not showDist; setToggleState(UI.distCheck, showDist, tr("dist")); showNotif(tr("dist"), showDist) end)
+UI.espFriendCheck.MouseButton1Click:Connect(function() espFriendEnabled = not espFriendEnabled; setToggleState(UI.espFriendCheck, espFriendEnabled, tr("friendEsp")); showNotif(tr("friendEsp"), espFriendEnabled) end)
+UI.friendNickCheck.MouseButton1Click:Connect(function() friendNickEnabled = not friendNickEnabled; setToggleState(UI.friendNickCheck, friendNickEnabled, tr("friendNick")); showNotif(tr("friendNick"), friendNickEnabled) end)
 
 -- TAB SWITCHING WITH ANIMATION
 local function switchTab(tabIndex)
-    local contents = {UI.mainContent, UI.friendsContent, UI.playerContent, UI.settingsContent, UI.aboutContent}
-    local buttons = {UI.tabMain, UI.tabFriends, UI.tabPlayer, UI.tabSettings, UI.tabAbout}
+    local contents = {UI.mainContent, UI.friendsContent, UI.playerContent, UI.funContent, UI.settingsContent, UI.aboutContent}
+    local buttons = {UI.tabMain, UI.tabFriends, UI.tabPlayer, UI.tabFun, UI.tabSettings, UI.tabAbout}
 
     for i, content in ipairs(contents) do
         if i == tabIndex then
@@ -2357,8 +2942,9 @@ end
 UI.tabMain.MouseButton1Click:Connect(function() switchTab(1) end)
 UI.tabFriends.MouseButton1Click:Connect(function() switchTab(2) end)
 UI.tabPlayer.MouseButton1Click:Connect(function() switchTab(3) end)
-UI.tabSettings.MouseButton1Click:Connect(function() switchTab(4) end)
-UI.tabAbout.MouseButton1Click:Connect(function() switchTab(5) end)
+UI.tabFun.MouseButton1Click:Connect(function() switchTab(4) end)
+UI.tabSettings.MouseButton1Click:Connect(function() switchTab(5) end)
+UI.tabAbout.MouseButton1Click:Connect(function() switchTab(6) end)
 
 -- UI INITIALIZATION
 initializeTexts = function()
@@ -2378,6 +2964,8 @@ initializeTexts = function()
     UI.espSetLabel.Text = tr("espSettings")
     UI.espColorBtn.Text = tr("espColorBtn")
     UI.friendColorBtn.Text = tr("friendColorBtn")
+    UI.espDistLbl.Text = tr("espMaxDist") .. tostring(espMaxDist)
+    UI.espSizeLbl.Text = tr("espTextSize") .. tostring(espTextSize)
     UI.espClose.Text = tr("close")
     UI.aimSetLabel.Text = tr("aimSettings")
     UI.targetLabel.Text = tr("target")
@@ -2394,13 +2982,17 @@ initializeTexts = function()
     UI.enemyLbl.Text = tr("showEnemy")
     UI.friendLbl.Text = tr("showFriend")
     UI.arrowsLbl.Text = tr("showArrows")
+    UI.notifsLbl.Text = tr("islandNotifs")
     UI.arrSizeLabel.Text = tr("arrowSize") .. tostring(islandArrowSize)
     UI.closeIslandBtn.Text = tr("close")
 
     setToggleState(UI.espToggle, espEnabled)
     setToggleState(UI.aimToggle, aimbotEnabled)
+    setToggleState(UI.alwaysAimToggle, alwaysAimEnabled)
     setToggleState(UI.rainbowBodyToggle, rainbowBodyEnabled)
     setToggleState(UI.rainbowArmsToggle, rainbowArmsEnabled)
+    setToggleState(UI.spinToggle, spinEnabled)
+    setToggleState(UI.headlessToggle, headlessEnabled)
     setToggleState(UI.islandToggle, islandEnabled)
     setToggleState(UI.fovToggleBtn, customFovEnabled)
     setToggleState(UI.fpsToggleBtn, islandShowFps)
@@ -2409,6 +3001,7 @@ initializeTexts = function()
     setToggleState(UI.enemyToggleBtn, islandShowEnemy)
     setToggleState(UI.friendToggleBtn, islandShowFriend)
     setToggleState(UI.arrowsToggleBtn, islandShowArrows)
+    setToggleState(UI.notifsToggleBtn, islandNotificationsEnabled)
     
     setToggleState(UI.nameCheck, showName, tr("nick"))
     setToggleState(UI.distCheck, showDist, tr("dist"))
@@ -2416,8 +3009,13 @@ initializeTexts = function()
     setToggleState(UI.friendNickCheck, friendNickEnabled, tr("friendNick"))
     setToggleState(UI.aimFriendsBtn, aimFriendsEnabled, tr("aimFriends"))
     setToggleState(UI.targetEspBtn, targetEspEnabled, tr("targetEsp"))
+    setToggleState(UI.aimConstantBtn, aimConstantEnabled, tr("constantTarget"))
+
+    setToggleState(UI.aaAimFriendsBtn, alwaysAimFriendsEnabled, tr("aimFriends"))
+    setToggleState(UI.aaConstantBtn, alwaysAimConstantEnabled, tr("constantTarget"))
 
     UI.radiusLabel2.Text = tr("radius") .. tostring(aimRadius)
+    UI.aaRadiusLabel.Text = tr("radius") .. tostring(alwaysAimRadius)
     
     updateDeviceLayout()
 end
@@ -2425,10 +3023,12 @@ end
 switchTab(1)
 initializeTexts()
 updateTargetButtons()
+updateAaTargetButtons()
 
--- === RENDER LOOP (RAINBOW, ISLAND & ESP) ===
+-- === RENDER LOOP (RAINBOW, SPIN, ISLAND & ESP) ===
 local frameCount, lastTick = 0, tick()
 local cachedFps, cachedPing = 0, 0
+local hueOffset = 0
 
 RunService.RenderStepped:Connect(function()
     frameCount = frameCount + 1
@@ -2441,21 +3041,16 @@ RunService.RenderStepped:Connect(function()
     end
 
     if isRainbowTheme then
-        themeColor = Color3.fromHSV((tick() * 0.1) % 1, 1, 1)
+        themeColor = Color3.fromHSV((now * 0.1) % 1, 1, 1)
         updateThemeColor()
     end
 
+    -- Island updates
     if islandEnabled then
         local parts = {}
-        if islandShowFps then
-            table.insert(parts, string.format("FPS: %d", cachedFps))
-        end
-        if islandShowPing then
-            table.insert(parts, string.format("%dms", cachedPing))
-        end
-        if islandShowPlayers then
-            table.insert(parts, string.format("Plrs: %d", #game.Players:GetPlayers()))
-        end
+        if islandShowFps then table.insert(parts, string.format("FPS: %d", cachedFps)) end
+        if islandShowPing then table.insert(parts, string.format("%dms", cachedPing)) end
+        if islandShowPlayers then table.insert(parts, string.format("Plrs: %d", #game.Players:GetPlayers())) end
 
         local myChar = player.Character
         local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -2498,15 +3093,25 @@ RunService.RenderStepped:Connect(function()
         end
 
         local statText = table.concat(parts, " | ")
-        UI.islandStats.Text = statText ~= "" and statText or "---"
+        
+        if now < notifEndTime and notifText ~= "" then
+            UI.islandStats.Text = notifText
+        else
+            UI.islandStats.Text = statText ~= "" and statText or "---"
+        end
 
-        local calcWidth = math.max(260, #UI.islandStats.Text * 7 + 120)
-        UI.islandFrame.Size = UDim2.new(0, calcWidth, 0, 36)
+        -- Ограничение длины острова (чтобы не был слишком длинным)
+        local calcWidth = math.clamp(260 + #UI.islandStats.Text * 5, 260, 420)
+        
+        if UI.islandFrame.Size.X.Offset ~= calcWidth then
+            animate(UI.islandFrame, {Size = UDim2.new(0, calcWidth, 0, 36)}, 0.3)
+            if not isEditingIsland and not customIslandPos then
+                animate(UI.islandFrame, {Position = UDim2.new(0.5, -calcWidth / 2, 0, 50)}, 0.3)
+            end
+        end
 
         if not isEditingIsland then
-            if not customIslandPos then
-                UI.islandFrame.Position = UDim2.new(0.5, -calcWidth / 2, 0, 50)
-            else
+            if customIslandPos then
                 local cam = workspace.CurrentCamera
                 if cam then
                     local currentX = UI.islandFrame.AbsolutePosition.X
@@ -2582,24 +3187,14 @@ RunService.RenderStepped:Connect(function()
         arrowFolder:ClearAllChildren()
     end
 
-    if rainbowBodyEnabled and player.Character then
-        local hue = (tick() * 0.1) % 1
-        local color = Color3.fromHSV(hue, 1, 1)
-        for _, name in ipairs({"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}) do
-            local part = player.Character:FindFirstChild(name)
-            if part then
-                local hl = part:FindFirstChild("BodyHL") or Instance.new("Highlight")
-                hl.Name = "BodyHL"
-                hl.Parent = part
-                hl.Adornee = part
-                hl.FillTransparency = 0.3
-                hl.FillColor = color
-            end
-        end
+    -- Rainbow Body Highlight Updates
+    if rainbowBodyEnabled and rbHighlightInstance and rbHighlightInstance.Parent then
+        hueOffset = (hueOffset + 0.004) % 1 
+        rbHighlightInstance.FillColor = Color3.fromHSV(hueOffset, 1, 1)
     end
 
     if rainbowArmsEnabled and player.Character then
-        local hue = (tick() * 0.1) % 1
+        local hue = (now * 0.1) % 1
         local color = Color3.fromHSV(hue, 1, 1)
         for _, name in ipairs({"Left Arm", "Right Arm", "LeftArm", "RightArm"}) do
             local part = player.Character:FindFirstChild(name)
@@ -2612,6 +3207,11 @@ RunService.RenderStepped:Connect(function()
                 hl.FillColor = color
             end
         end
+    end
+
+    -- Spin update
+    if spinEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(spinSpeed), 0)
     end
 end)
 
@@ -2635,7 +3235,7 @@ RunService.RenderStepped:Connect(function()
             if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
                 local root = plr.Character.HumanoidRootPart
                 local dist = (root.Position - myRoot.Position).Magnitude
-                if dist <= 10000 then
+                if dist <= espMaxDist then
                     local isFriend = friends[plr.Name] == true
                     
                     local shouldHighlight = (not isFriend) or (isFriend and espFriendEnabled)
@@ -2645,7 +3245,7 @@ RunService.RenderStepped:Connect(function()
                         hl.Parent = plr.Character
                         hl.Adornee = plr.Character
                         
-                        local isTarget = targetEspEnabled and aimbotEnabled and (currentAimbotTarget == plr)
+                        local isTarget = targetEspEnabled and ((aimbotEnabled and currentAimbotTarget == plr) or (alwaysAimEnabled and currentAlwaysAimTarget == plr))
                         
                         if isTarget then
                             hl.FillTransparency = 0
@@ -2675,7 +3275,7 @@ RunService.RenderStepped:Connect(function()
                         shouldShowNick = showName
                     end
 
-                    if dist <= 1000 and (shouldShowNick or showDist) then
+                    if shouldShowNick or showDist then
                         local bill = plr.Character:FindFirstChild("NameBillboard") or Instance.new("BillboardGui")
                         bill.Name = "NameBillboard"
                         bill.Size = UDim2.new(0, 200, 0, 40)
@@ -2686,7 +3286,8 @@ RunService.RenderStepped:Connect(function()
                         local label = bill:FindFirstChild("TextLabel") or Instance.new("TextLabel")
                         label.Size = UDim2.new(1, 0, 1, 0)
                         label.BackgroundTransparency = 1
-                        label.TextScaled = true
+                        label.TextScaled = false
+                        label.TextSize = espTextSize
                         label.Font = Enum.Font.GothamBold
                         label.Parent = bill
 
@@ -2734,8 +3335,12 @@ RunService.RenderStepped:Connect(function()
         if viewport.X > 0 and viewport.Y > 0 then
             circle.Position = Vector2.new(viewport.X / 2, viewport.Y / 2)
         end
-        circle.Radius = aimRadius
-        circle.Visible = aimbotEnabled and (currentDevice == "PC" or (currentDevice == "Phone" and isMobileAiming))
+        if alwaysAimEnabled then
+            circle.Radius = alwaysAimRadius
+        else
+            circle.Radius = aimRadius
+        end
+        circle.Visible = alwaysAimEnabled or (aimbotEnabled and (currentDevice == "PC" or (currentDevice == "Phone" and isMobileAiming)))
     end)
 end)
 
@@ -2751,35 +3356,44 @@ UserInputService.InputEnded:Connect(function(input, processed)
     end
 end)
 
-local function getClosestTarget()
-    if not player.Character or not player.Character:FindFirstChild(aimTarget) then return nil end
+local function getClosestTarget(isAlwaysAim)
+    local targetPartName = isAlwaysAim and alwaysAimTarget or aimTarget
+    local radius = isAlwaysAim and alwaysAimRadius or aimRadius
+    local useConstant = isAlwaysAim and alwaysAimConstantEnabled or aimConstantEnabled
+    local constantList = isAlwaysAim and alwaysAimConstantList or aimConstantList
+    local useAimFriends = isAlwaysAim and alwaysAimFriendsEnabled or aimFriendsEnabled
+    
+    if not player.Character or not player.Character:FindFirstChild(targetPartName) then return nil end
     local closest, bestDist = nil, math.huge
     local center = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
 
     for _, plr in ipairs(game.Players:GetPlayers()) do
-        if plr ~= player and plr.Character and plr.Character:FindFirstChild(aimTarget) then
-            local isFriend = friends[plr.Name] == true
-            if not isFriend or aimFriendsEnabled then
-                local targetPart = plr.Character[aimTarget]
-                local screenPos, onScreen = cam:WorldToScreenPoint(targetPart.Position)
-                if onScreen then
-                    local mag = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                    if mag <= aimRadius then
-                        
-                        local isValid = true
-                        if wallcheckEnabled then
-                            local origin = cam.CFrame.Position
-                            local dir = (targetPart.Position - origin).Unit
-                            local ray = Ray.new(origin, dir * 5000)
-                            local hit = workspace:FindPartOnRayWithIgnoreList(ray, {player.Character})
-                            if not hit or (not hit:IsDescendantOf(plr.Character) and hit ~= targetPart) then
-                                isValid = false
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild(targetPartName) then
+            
+            if not (useConstant and not constantList[plr.Name]) then
+                local isFriend = friends[plr.Name] == true
+                if not isFriend or useAimFriends then
+                    local targetPart = plr.Character[targetPartName]
+                    local screenPos, onScreen = cam:WorldToScreenPoint(targetPart.Position)
+                    if onScreen then
+                        local mag = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                        if mag <= radius then
+                            
+                            local isValid = true
+                            if wallcheckEnabled then
+                                local origin = cam.CFrame.Position
+                                local dir = (targetPart.Position - origin).Unit
+                                local ray = Ray.new(origin, dir * 5000)
+                                local hit = workspace:FindPartOnRayWithIgnoreList(ray, {player.Character})
+                                if not hit or (not hit:IsDescendantOf(plr.Character) and hit ~= targetPart) then
+                                    isValid = false
+                                end
                             end
-                        end
 
-                        if isValid and mag < bestDist then
-                            bestDist = mag
-                            closest = plr
+                            if isValid and mag < bestDist then
+                                bestDist = mag
+                                closest = plr
+                            end
                         end
                     end
                 end
@@ -2789,24 +3403,44 @@ local function getClosestTarget()
     return closest
 end
 
--- TRADITIONAL AIMBOT HEARTBEAT
+-- Поиск таргета в Heartbeat
 RunService.Heartbeat:Connect(function()
     pcall(function()
-        if not aimbotEnabled then
+        if aimbotEnabled then
+            currentAimbotTarget = getClosestTarget(false)
+        else
             currentAimbotTarget = nil
-            return 
         end
         
-        currentAimbotTarget = getClosestTarget()
-        
-        local shouldAim = false
-        if currentDevice == "PC" then
-            shouldAim = isRightButtonDown
-        elseif currentDevice == "Phone" then
-            shouldAim = isMobileAiming
+        if alwaysAimEnabled then
+            currentAlwaysAimTarget = getClosestTarget(true)
+        else
+            currentAlwaysAimTarget = nil
         end
+    end)
+end)
 
-        if shouldAim and currentAimbotTarget and currentAimbotTarget.Character and currentAimbotTarget.Character:FindFirstChild(aimTarget) then
+-- ЖЕСТКАЯ ПРИВЯЗКА (НАМЕРТВО) С ПРИОРИТЕТОМ ВЫШЕ КАМЕРЫ (Игнор отдачи)
+RunService:BindToRenderStep("RigidAimbotLock", Enum.RenderPriority.Camera.Value + 1, function()
+    pcall(function()
+        if not cam then return end
+        
+        -- Always Aim приоритетнее
+        if alwaysAimEnabled and currentAlwaysAimTarget and currentAlwaysAimTarget.Character and currentAlwaysAimTarget.Character:FindFirstChild(alwaysAimTarget) then
+            cam.CFrame = CFrame.new(cam.CFrame.Position, currentAlwaysAimTarget.Character[alwaysAimTarget].Position)
+            return
+        end
+        
+        local shouldAimbot = false
+        if aimbotEnabled then
+            if currentDevice == "PC" then
+                shouldAimbot = isRightButtonDown
+            elseif currentDevice == "Phone" then
+                shouldAimbot = isMobileAiming
+            end
+        end
+        
+        if shouldAimbot and currentAimbotTarget and currentAimbotTarget.Character and currentAimbotTarget.Character:FindFirstChild(aimTarget) then
             cam.CFrame = CFrame.new(cam.CFrame.Position, currentAimbotTarget.Character[aimTarget].Position)
         end
     end)
@@ -2837,24 +3471,40 @@ UserInputService.InputBegan:Connect(function(input, processed)
         if key == keyBinds.ESP then 
             espEnabled = not espEnabled
             setToggleState(UI.espToggle, espEnabled)
+            showNotif(tr("esp"), espEnabled)
         end
         if key == keyBinds.Aimbot then 
             aimbotEnabled = not aimbotEnabled
             setToggleState(UI.aimToggle, aimbotEnabled)
+            showNotif(tr("aimbot"), aimbotEnabled)
+            if aimbotEnabled and alwaysAimEnabled then
+                alwaysAimEnabled = false
+                setToggleState(UI.alwaysAimToggle, false)
+            end
+        end
+        if key == keyBinds.AlwaysAim and currentDevice == "PC" then
+            alwaysAimEnabled = not alwaysAimEnabled
+            setToggleState(UI.alwaysAimToggle, alwaysAimEnabled)
+            showNotif("Always Aim", alwaysAimEnabled)
+            if alwaysAimEnabled and aimbotEnabled then
+                aimbotEnabled = false
+                setToggleState(UI.aimToggle, false)
+            end
         end
         if key == keyBinds.RainbowBody then 
             rainbowBodyEnabled = not rainbowBodyEnabled
             setToggleState(UI.rainbowBodyToggle, rainbowBodyEnabled)
-            if not rainbowBodyEnabled and player.Character then
-                for _, name in ipairs({"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}) do
-                    local p = player.Character:FindFirstChild(name)
-                    if p and p:FindFirstChild("BodyHL") then p.BodyHL:Destroy() end
-                end
+            showNotif(tr("rainbowBody"), rainbowBodyEnabled)
+            if rainbowBodyEnabled then
+                createOrUpdateHighlight()
+            else
+                stopRainbowEffect()
             end
         end
         if key == keyBinds.RainbowArms then 
             rainbowArmsEnabled = not rainbowArmsEnabled
             setToggleState(UI.rainbowArmsToggle, rainbowArmsEnabled)
+            showNotif(tr("rainbowArms"), rainbowArmsEnabled)
             if not rainbowArmsEnabled and player.Character then
                 for _, name in ipairs({"Left Arm", "Right Arm", "LeftArm", "RightArm"}) do
                     local p = player.Character:FindFirstChild(name)
@@ -2865,12 +3515,14 @@ UserInputService.InputBegan:Connect(function(input, processed)
         if key == keyBinds.Island then 
             islandEnabled = not islandEnabled
             setToggleState(UI.islandToggle, islandEnabled)
+            showNotif(tr("islandToggle"), islandEnabled)
             UI.islandFrame.Visible = islandEnabled
             if not islandEnabled then arrowFolder:ClearAllChildren() end
         end
         if key == keyBinds.FOV then 
             customFovEnabled = not customFovEnabled
             setToggleState(UI.fovToggleBtn, customFovEnabled)
+            showNotif(tr("fovToggle"), customFovEnabled)
             if not customFovEnabled then
                 workspace.CurrentCamera.FieldOfView = 70
             else
